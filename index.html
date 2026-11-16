@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Epicenter Outbreak Response</title>
+<meta name="description" content="A 3D outbreak-response game: play as a CDC epidemiologist, contain a new disease, build a vaccine and save lives.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="scene" aria-label="3D view of the CDC headquarters"></canvas>
+
+<!-- ===== HUD ===== -->
+<div id="hud" hidden>
+  <header id="topbar">
+    <div class="tb-left">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>EPICENTER</span></div>
+      <div class="clock">
+        <div class="clock-day" id="hud-day">Day 0</div>
+        <div class="clock-date" id="hud-date">Mar 3, 2027</div>
+      </div>
+      <div class="speed" role="group" aria-label="Game speed">
+        <button type="button" id="spd-0" data-speed="0" title="Pause (Space)" aria-label="Pause">❚❚</button>
+        <button type="button" id="spd-1" data-speed="1" title="1× (1)">1×</button>
+        <button type="button" id="spd-2" data-speed="2" title="2× (2)">2×</button>
+        <button type="button" id="spd-4" data-speed="4" title="4× (3)">4×</button>
+        <button type="button" id="spd-8" data-speed="8" title="8× (4)">8×</button>
+      </div>
+      <div class="pause-pill" id="pause-pill" hidden>PAUSED</div>
+    </div>
+    <div class="tb-meters" id="hud-meters"></div>
+    <div class="tb-stats" id="hud-stats"></div>
+  </header>
+
+  <aside id="objectives" aria-label="Objectives">
+    <button type="button" class="obj-head" id="obj-toggle" aria-expanded="true">Objectives</button>
+    <ol id="obj-list"></ol>
+  </aside>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <div id="prompt" hidden>
+    <button type="button" id="prompt-btn"><kbd>E</kbd><span id="prompt-text">Interact</span></button>
+  </div>
+
+  <nav id="quicknav" aria-label="Walk to a room"></nav>
+
+  <div id="ticker"><span class="ticker-tag">NEWS</span><div class="ticker-track"><span id="ticker-text"></span></div></div>
+
+  <button type="button" id="help-btn" title="Controls (H)" aria-label="Controls">?</button>
+</div>
+
+<!-- ===== Station console ===== -->
+<section id="console" hidden aria-modal="false" role="dialog" aria-labelledby="console-title">
+  <header class="con-head">
+    <div>
+      <div class="con-kicker" id="console-kicker">Station</div>
+      <h2 id="console-title">Console</h2>
+    </div>
+    <button type="button" class="con-close" id="console-close" aria-label="Close console (Esc)">✕</button>
+  </header>
+  <div class="con-tabs" id="console-tabs" role="tablist"></div>
+  <div class="con-body" id="console-body"></div>
+</section>
+
+<!-- ===== Event / story dialog ===== -->
+<div id="modal-wrap" hidden>
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-from" id="modal-from"></div>
+    <h2 id="modal-title">Title</h2>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-choices" id="modal-choices"></div>
+  </div>
+</div>
+
+<!-- ===== Help ===== -->
+<div id="help" hidden>
+  <div class="help-card">
+    <h2>Controls</h2>
+    <dl>
+      <dt>Walk</dt><dd>Click or tap the floor · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows · hold <kbd>Shift</kbd> to run</dd>
+      <dt>Look around</dt><dd>Drag the view · scroll or pinch to zoom</dd>
+      <dt>Interact</dt><dd>Walk up to a glowing station and press <kbd>E</kbd>, or click its marker</dd>
+      <dt>Quick travel</dt><dd>Use the room buttons at the bottom. You still walk there, and the outbreak keeps moving while you do.</dd>
+      <dt>Time</dt><dd><kbd>Space</kbd> pause · <kbd>1</kbd>–<kbd>4</kbd> speed · consoles pause time (you can change this in Your Office)</dd>
+      <dt>Close</dt><dd><kbd>Esc</kbd> closes consoles and this panel</dd>
+    </dl>
+    <button type="button" class="btn primary" id="help-close">Back to work</button>
+  </div>
+</div>
+
+<!-- ===== Title screen ===== -->
+<div id="title">
+  <div class="title-card">
+    <div class="title-eyebrow">Centers for Disease Control · Emergency Response</div>
+    <h1 class="title-name">EPICENTER</h1>
+    <p class="title-pitch">A new disease has just appeared on American soil. You're the CDC epidemiologist in charge. Find out what it is, slow its spread, build a vaccine and keep people alive.</p>
+
+    <div class="title-section">
+      <div class="title-label" id="mode-label">Choose a scenario</div>
+      <div class="mode-grid" role="radiogroup" aria-labelledby="mode-label">
+        <button type="button" class="mode-card selected" data-mode="story" role="radio" aria-checked="true">
+          <span class="mode-tag">Story</span>
+          <span class="mode-name">Vesper</span>
+          <span class="mode-desc">A cluster of strange deaths in Houston. A handcrafted outbreak with characters, tough calls and a mutating virus.</span>
+        </button>
+        <button type="button" class="mode-card" data-mode="random" role="radio" aria-checked="false">
+          <span class="mode-tag">Outbreak generator</span>
+          <span class="mode-name">Disease X</span>
+          <span class="mode-desc">A brand-new pathogen every game: coronavirus, flu, filovirus or worse. You only learn its traits through lab work.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="title-row">
+      <div class="title-section">
+        <div class="title-label" id="diff-label">Difficulty</div>
+        <div class="seg" role="radiogroup" aria-labelledby="diff-label">
+          <button type="button" data-diff="recruit" role="radio" aria-checked="false">Recruit</button>
+          <button type="button" data-diff="officer" class="selected" role="radio" aria-checked="true">Field Officer</button>
+          <button type="button" data-diff="director" role="radio" aria-checked="false">Incident Director</button>
+        </div>
+      </div>
+      <div class="title-section">
+        <label class="title-label" for="player-name">Your name</label>
+        <input id="player-name" type="text" maxlength="28" value="Dr. Taylor Quinn" autocomplete="off">
+      </div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="opt-autopause" checked> Pause time while I'm using a console</label>
+
+    <div class="title-actions">
+      <button type="button" class="btn primary big" id="start-btn" disabled>Loading headquarters…</button>
+      <button type="button" class="btn ghost" id="title-help">How to play</button>
+    </div>
+    <p class="title-fine">A fictional, semi-realistic simulation for fun and learning. Not affiliated with or endorsed by the U.S. Centers for Disease Control and Prevention.</p>
+    <p class="title-error" id="load-error" hidden></p>
+  </div>
+</div>
+
+<!-- ===== End screen ===== -->
+<div id="end" hidden>
+  <div class="end-card">
+    <div class="end-kicker" id="end-kicker">After-action report</div>
+    <div class="end-top">
+      <div>
+        <h1 id="end-title">Outbreak contained</h1>
+        <p id="end-summary"></p>
+      </div>
+      <div class="grade" id="end-grade">A</div>
+    </div>
+    <div class="end-stats" id="end-stats"></div>
+    <div class="end-chart">
+      <div class="end-chart-label">Daily infections: what really happened vs. what was reported vs. no response</div>
+      <canvas id="end-canvas" width="900" height="260"></canvas>
+      <div class="legend" id="end-legend"></div>
+    </div>
+    <div class="end-actions">
+      <button type="button" class="btn primary big" id="again-btn">New outbreak</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+  // If the module graph (or the Three.js CDN) fails to load, say so instead of spinning forever.
+  setTimeout(function () {
+    if (window.__epicenterReady) return;
+    var e = document.getElementById('load-error');
+    var b = document.getElementById('start-btn');
+    if (e) { e.hidden = false; e.textContent = 'The 3D engine is taking a long time to load. Check your connection (Three.js loads from cdn.jsdelivr.net) and reload the page.'; }
+    if (b) b.textContent = 'Still loading…';
+  }, 15000);
+</script>
+</body>
+</html>
